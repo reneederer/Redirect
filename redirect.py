@@ -6,13 +6,18 @@ import os
 from psutil import process_iter
 from signal import SIGTERM
 import random
+import subprocess
+import time
 
+public_dir = "c:/users/rene"
+
+os.chdir(public_dir)
 hostName = "localhost"
 serverPort = 9077
 
 class MyServer(BaseHTTPRequestHandler):
     def do_GET(self):
-        print(f'{self.path}')
+        print(f'path: {self.path}')
         if self.path.startswith('/?url='):
             try:
                 video_id = self.path[6:]
@@ -23,22 +28,58 @@ class MyServer(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-type", "text/html")
                     self.end_headers()
-                    self.wfile.write(bytes(f'<html><head><title>{meta["title"]}</title></head><body style="background-color: black"><h1 style="text-align: center; color: gray">{meta["title"]}</h1><div style="text-align: center"><video oncanplay="this.play()" style="min-width:70%; min-height:70%" autoplay="true" controls="true" loop="true" src="{meta["url"]}"></div></video></body></html>', 'utf-8'))
+                    self.wfile.write(bytes(f'<html><head><title>{meta["title"]}</title></head><body style="background-color: black"><h1 style="text-align: center; color: gray">{meta["title"]}</h1><div style="text-align: center"><video dontoncanplay="this.play()" style="min-width:70%; min-height:70%" controls="true" src="{meta["url"]}"></video></div><div style="color: gray"><a href="{meta["uploader_url"]}">{meta["uploader"]}</a></div></body></html>', 'utf-8'))
             except Exception as e:
                 print(f'Error: {e}')
                 self.send_response(301)
-                self.send_header("Location", f'http://localhost:8080/?error={e}')
+                self.send_header("Location", f'http://localhost:9077/?error={e}')
                 self.end_headers()
         else:
             # Serve a local file over HTTP instead of redirecting to file://
             redirect_urls = [
-                r"C:\Users\rene\Downloads\Thomas' Calculus , Thirteenth Edition in SI Units.pdf",
-                "https://arithmetic.zetamac.com/game?key=7c500c3f"
+                #r"C:\Users\rene\Downloads\Thomas' Calculus , Thirteenth Edition in SI Units.pdf",
+                "https://arithmetic.zetamac.com/game?key=7c500c3f",
+                # r"C:\Users\rene\Desktop\The_Calculus_Lifesaver.pdf"
+                #"MITProbability/chapter14.mp4"
+                #r"C:\Users\rene\Downloads\Skript_StochMod.pdf"
+                #"https://ankiuser.net/study"
             ]
             random_url = random.choice(redirect_urls)
             print(f'Redirecting to: {random_url}')
-            
-            if not(random_url.startswith("http")):
+
+
+            if random_url.endswith('.mp4'):
+                # Serve files from the public directory
+                requested_file = os.path.join(public_dir, self.path.strip('/'))
+                if os.path.isfile(requested_file):
+                    try:
+                        self.send_response(200)
+                        content_type = "application/octet-stream"
+                        if requested_file.endswith(".html"):
+                            content_type = "text/html"
+                        elif requested_file.endswith(".mp4"):
+                            content_type = "video/mp4"
+                        elif requested_file.endswith(".pdf"):
+                            content_type = "application/pdf"
+                        self.send_header("Content-type", content_type)
+                        self.end_headers()
+                        
+                        with open(requested_file, "rb") as f:
+                            self.wfile.write(f.read())
+                    except Exception as e:
+                        print(f"Error serving file: {e}")
+                        self.send_response(500)
+                        self.end_headers()
+
+            elif random_url.lower().endswith(".pdf"):
+                # subprocess.run(executable=r"C:\Program Files (x86)\Foxit Software\Foxit PDF Reader\FoxitPDFReader.exe", args=random_url)
+                subprocess.run(["start", random_url], shell=True, check=True)
+                self.send_response(301)
+                self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")  # No caching
+                self.send_header("Pragma", "no-cache")  # Older header for HTTP/1.0 clients
+                self.send_header("Expires", "0")  # Set expiration to 0
+                self.end_headers()
+            elif not(random_url.startswith("http")):
                 if os.path.exists(random_url):
                     self.send_response(200)
                     self.send_header("Content-type", "application/pdf")
